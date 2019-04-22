@@ -16,7 +16,7 @@
 import Foundation
 import googleapis
 
-let API_KEY : String = "YOUR_API_KEY"
+let API_KEY : String = "AIzaSyDxYTVNgwBjIeaMe27qTLU2TSE_DnB_75I"
 let HOST = "speech.googleapis.com"
 
 typealias SpeechRecognitionCompletionHandler = (StreamingRecognizeResponse?, NSError?) -> (Void)
@@ -39,7 +39,7 @@ class SpeechRecognitionService {
       call = client.rpcToStreamingRecognize(withRequestsWriter: writer,
                                             eventHandler:
         { (done, response, error) in
-                                              completion(response, error as? NSError)
+            completion(response, error as NSError?)
       })
       // authenticate using an API key obtained from the Google Cloud Console
       call.requestHeaders.setObject(NSString(string:API_KEY),
@@ -48,7 +48,7 @@ class SpeechRecognitionService {
       call.requestHeaders.setObject(NSString(string:Bundle.main.bundleIdentifier!),
                                     forKey:NSString(string:"X-Ios-Bundle-Identifier"))
 
-      print("HEADERS:\(call.requestHeaders)")
+        print("HEADERS:\(String(describing: call.requestHeaders))")
 
       call.start()
       streaming = true
@@ -57,7 +57,7 @@ class SpeechRecognitionService {
       let recognitionConfig = RecognitionConfig()
       recognitionConfig.encoding =  .linear16
       recognitionConfig.sampleRateHertz = Int32(sampleRate)
-      recognitionConfig.languageCode = "en-US"
+      recognitionConfig.languageCode = "ja-JP"
       recognitionConfig.maxAlternatives = 30
       recognitionConfig.enableWordTimeOffsets = true
 
