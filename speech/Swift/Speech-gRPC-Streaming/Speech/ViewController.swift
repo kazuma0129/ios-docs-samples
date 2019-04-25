@@ -19,6 +19,9 @@ import googleapis
 
 let SAMPLE_RATE = 16000
 
+var stream_count : Int = 0
+var post_str : String = ""
+
 class ViewController : UIViewController, AudioControllerDelegate {
     @IBOutlet weak var textView: UITextView!
     @IBOutlet weak var imageView: UIImageView!
@@ -55,6 +58,7 @@ class ViewController : UIViewController, AudioControllerDelegate {
     let chunkSize : Int /* bytes/chunk */ = Int(0.1 /* seconds/chunk */
       * Double(SAMPLE_RATE) /* samples/second */
       * 2 /* bytes/sample */);
+    var words : [String] = []
 
     if (audioData.length > chunkSize) {
       SpeechRecognitionService.sharedInstance.streamAudioData(audioData,
@@ -73,7 +77,20 @@ class ViewController : UIViewController, AudioControllerDelegate {
                     if let result = result as? StreamingRecognitionResult {
                         if result.isFinal {
                             finished = true
+                            stream_count += 1
                             print("it finished")
+                            for alternative in result.alternativesArray! {
+                                if let alternative = alternative as? SpeechRecognitionAlternative {
+                                    for word in alternative.wordsArray!{
+                                        if let word = word as? WordInfo{
+                                            let before_process : String = word.word
+                                            let index = before_process.firstIndex(of: "|") ?? before_process.endIndex
+                                            let after_process : String = String(before_process[..<index])
+                                            words.append(after_process)
+                                        }
+                                    }
+                                }
+                            }
                         }
                         else{
                             print("duration")
@@ -83,53 +100,57 @@ class ViewController : UIViewController, AudioControllerDelegate {
                 strongSelf.textView.text = response.description
                 if finished {
                     strongSelf.stopAudio(strongSelf)
-                    
-                    let url = URL(string: "https://wordcloudservice.p.rapidapi.com/generate_wc")
-                    var request = URLRequest(url: url!)
-                    
-                    // POSTを指定
-                    request.httpMethod = "POST"
-                    // json形式でデータを送信
-                    request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-                    // WordCloudAPIの認証情報
-                    request.addValue("wordcloudservice.p.rapidapi.com", forHTTPHeaderField: "X-RapidAPI-Host")
-                    request.addValue("03b9d85ae9msh9d564ccdb598d71p139399jsna507c8dd9eb4", forHTTPHeaderField: "X-RapidAPI-Key")
-                    // POSTするデータを構造体で定義
-                    struct Record:Codable {
-                        let textblock:String
+                    for word in words{
+                        post_str += word + " "
                     }
-                    // 以下HTTP POST
-                    let record = Record(textblock:"Lorem ipsum dolor sit amet")
-                    let encoder = JSONEncoder()
-                    do {
-                        let data = try encoder.encode(record)
-                        let jsonstr:String = String(data: data, encoding: .utf8)!
-                        request.httpBody = jsonstr.data(using: .utf8)
-                        print(jsonstr)
-                    } catch {
-                        print(error.localizedDescription)
-                    }
-                    // 以下HTTP POSTのレスポンス
-                    let session = URLSession.shared
-                    session.dataTask(with: request) { (data, response, error) in
-                        if error == nil, let data = data, let response = response as? HTTPURLResponse {
-                            // HTTPヘッダの取得
-                            print("Content-Type: \(response.allHeaderFields["Content-Type"] ?? "")")
-                            // HTTPステータスコード
-                            print("statusCode: \(response.statusCode)")
-                            
-                            let dic = try! JSONSerialization.jsonObject(with: data, options: .allowFragments) as! [String: Any]
-                            let imgUrl = dic["url"] as! String
-                            print("url \(imgUrl)")
-                            
-                            // 画像をurlで表示させたいときは以下コメントアウト
-//                            strongSelf.textView.text = imgUrl
-                            
-                            let url = NSURL(string: imgUrl);
-                            let imageData = NSData(contentsOf: url! as URL) //もし、画像が存在しない可能性がある場合は、ifで存在チェック
-//                            strongSelf.imageView.image = UIImage(data:imageData! as Data)
+                    if stream_count > 3 {
+                        stream_count = 0
+                        let url = URL(string: "https://wordcloudservice.p.rapidapi.com/generate_wc")
+                        var request = URLRequest(url: url!)
+                        // POSTを指定
+                        request.httpMethod = "POST"
+                        // json形式でデータを送信
+                        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+                        // WordCloudAPIの認証情報
+                        request.addValue("wordcloudservice.p.rapidapi.com", forHTTPHeaderField: "X-RapidAPI-Host")
+                        request.addValue("03b9d85ae9msh9d564ccdb598d71p139399jsna507c8dd9eb4", forHTTPHeaderField: "X-RapidAPI-Key")
+                        // POSTするデータを構造体で定義
+                        struct Record:Codable {
+                            let textblock:String
                         }
-                        }.resume()
+                        // 以下HTTP POST
+                        let record = Record(textblock:post_str)
+                        let encoder = JSONEncoder()
+                        do {
+                            let data = try encoder.encode(record)
+                            let jsonstr:String = String(data: data, encoding: .utf8)!
+                            request.httpBody = jsonstr.data(using: .utf8)
+                            print(jsonstr)
+                        } catch {
+                            print(error.localizedDescription)
+                        }
+                        // 以下HTTP POSTのレスポンス
+                        let session = URLSession.shared
+                        session.dataTask(with: request) { (data, response, error) in
+                            if error == nil, let data = data, let response = response as? HTTPURLResponse {
+                                // HTTPヘッダの取得
+                                print("Content-Type: \(response.allHeaderFields["Content-Type"] ?? "")")
+                                // HTTPステータスコード
+                                print("statusCode: \(response.statusCode)")
+                                
+                                let dic = try! JSONSerialization.jsonObject(with: data, options: .allowFragments) as! [String: Any]
+                                let imgUrl = dic["url"] as! String
+                                print("url \(imgUrl)")
+                                
+                                // 画像をurlで表示させたいときは以下コメントアウト
+    //                            strongSelf.textView.text = imgUrl
+                                
+    //                            let url = NSURL(string: imgUrl);
+    //                            let imageData = NSData(contentsOf: url! as URL) //もし、画像が存在しない可能性がある場合は、ifで存在チェック
+    //                            strongSelf.imageView.image = UIImage(data:imageData! as Data)
+                            }
+                            }.resume()
+                    }
                 }
             }
       })
